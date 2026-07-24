@@ -1,0 +1,705 @@
+---
+title: "Capstone_data_support_landscape"
+format: html
+editor: visual
+---
+
+setwd
+```{r}
+setwd("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/")
+```
+# load libraries
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(ggtext)
+library(readxl)
+```
+
+# read in the data
+```{r}
+library(readxl)
+library(readr)
+df <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (3).csv", skip = 2)
+
+```
+
+
+
+```{r}
+# Read just the very first row
+# second_row <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (3).csv", n_max = 1, col_names = FALSE)
+# top_row <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (3).csv", skip = 1, n_max = 1, col_names = FALSE)
+# 
+# # Create a named vector acting as a dictionary (key-value map)
+# # Assumes row 1 has descriptions/keys and row 2 has the standard names or vice versa
+# my_dict <- as.list(top_row)
+# names(my_dict) <- as.character(second_row)
+
+# Example lookup: my_dict[["ColumnName"]]
+```
+
+Read in the data with header issues resolved
+```{r}
+# # library(readxl)
+# # capstone_data <- read_excel("T:/JungMee/ICPSR_data/Providing_data_services/capstone_data - Sheet1.csv.xlsx")
+# 
+# # 1. Read the first two rows as raw data (no headers)
+# header_rows <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (3).csv", n_max = 2, col_names = FALSE)
+# 
+# # 2. Concatenate/combine the two rows element-wise using paste
+# new_names <- apply(header_rows, 2, paste, collapse = "_")
+# 
+# # 3. Read the rest of the file, skipping the first two rows, and assign new names
+# df <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (3).csv", skip = 2, col_names = new_names)
+```
+
+remove top 2 rows in R
+```{r}
+# df <- capstone_data_raw[-c(1:2), ]
+```
+
+
+rename a value in a cell
+```{r}
+# df[1, 1] <- "Librarian_Me"
+```
+
+
+write csv of this version
+```{r}
+# write.csv(df, "capstone_data_correct_header.csv", row.names = FALSE)
+```
+
+```{r}
+library(ggplot2)
+library(readr)
+library(dplyr)
+
+# --- Load data ---------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+
+# First two columns, referenced by position (robust to header changes)
+x_col <- names(df)[1]
+y_col <- names(df)[2]
+
+df <- df %>%
+  rename(x = 1, y = 2)
+
+
+df$y <- as.numeric(df$y)
+```
+
+# Bar chart for activities
+```{r}
+# --- Bar chart -----------------------------------------------------------
+p <- ggplot(df, aes(x = reorder(x, -y), y = y, fill = y)) +
+  geom_col(color = "black", width = 0.7) +
+  geom_text(aes(label = paste0(y, "%")), vjust = -0.5, fontface = "bold", size = 3.5) +
+  scale_fill_viridis_c(name = y_col, guide = "none") +
+  labs(
+    title = "Percentage Time Allocated by Person",
+    x = "Title of PersonPercentage of Work Hours",
+    y = "Percentage of Work Hours"
+  ) +
+  ylim(0, max(df$y) * 1.15) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p)
+
+ggsave("bar_chart_R.png", plot = p, width = 10, height = 6, dpi = 150)
+
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+
+# --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+
+# --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
+plot_df <- df %>%
+  select(Person_title, starts_with("Collecting and discovery_")) %>%
+  pivot_longer(
+    cols = -Person_title,
+    names_to = "Activity",
+    values_to = "Level"
+  ) %>%
+  mutate(
+    # Strip the "Collecting and discovery_" prefix for cleaner labels
+    Activity = str_remove(Activity, "^Collecting and discovery_"),
+    # Order the ordinal levels RARE < TOUCH < DO, and map to a numeric score
+    Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE),
+    Level_num = as.numeric(Level)   # RARE = 1, TOUCH = 2, DO = 3
+  )
+
+# ============================================================================
+# HEATMAP
+# ============================================================================
+p_heatmap <- ggplot(plot_df, aes(x = Activity, y = Person_title, fill = Level)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  scale_fill_manual(
+    values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+    name = "Involvement"
+  ) +
+  labs(
+    title = "Collecting and Discovery: Involvement by Person",
+    x = "Activity",
+    y = "Person"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_heatmap)
+ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height = 6, dpi = 150)
+
+
+```
+
+```{r}
+# ============================================================================
+# OPTION 2: BUBBLE CHART (size + color both encode the ordinal level)
+# ============================================================================
+# p_bubble <- ggplot(plot_df, aes(x = Activity, y = Person_title)) +
+#   geom_point(aes(size = Level_num, color = Level), alpha = 0.85) +
+#   scale_size_continuous(range = c(2, 10), guide = "none") +
+#   scale_color_manual(
+#     values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+#     name = "Involvement"
+#   ) +
+#   labs(
+#     title = "Collecting and Discovery: Involvement by Person",
+#     x = "Activity",
+#     y = "Person"
+#   ) +
+#   theme_minimal(base_size = 12) +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1),
+#     panel.grid.minor = element_blank(),
+#     plot.title = element_text(face = "bold")
+#   )
+# 
+# print(p_bubble)
+# ggsave("collecting_discovery_bubble.png", plot = p_bubble, width = 10, height = 6, dpi = 150)
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(ggtext)   # install.packages("ggtext") -- enables per-label bold/color on axis text
+
+# --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+
+# --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
+plot_df <- df %>%
+  select(Person_title, starts_with("Collecting and discovery_")) %>%
+  pivot_longer(
+    cols = -Person_title,
+    names_to = "Activity",
+    values_to = "Level"
+  ) %>%
+  mutate(
+    # Strip the "Collecting and discovery_" prefix for cleaner labels
+    Activity = str_remove(Activity, "^Collecting and discovery_"),
+    # Order the ordinal levels RARE < TOUCH < DO, and map to a numeric score
+    Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE),
+    Level_num = as.numeric(Level)   # RARE = 1, TOUCH = 2, DO = 3
+  )
+
+# ============================================================================
+# HEATMAP  (with Librarian_Me highlighted)
+# ============================================================================
+highlight_person <- "Librarian_Me"
+
+# Preserve a fixed row order so we can compute the highlighted row's y-position
+person_levels <- unique(plot_df$Person_title)
+plot_df <- plot_df %>%
+  mutate(Person_title = factor(Person_title, levels = person_levels))
+
+n_activities <- n_distinct(plot_df$Activity)
+highlight_y <- which(person_levels == highlight_person)
+
+# Bold the one axis label using markdown syntax (rendered via ggtext::element_markdown)
+y_labels <- ifelse(person_levels == highlight_person,
+                    paste0("**", person_levels, "**"),
+                    person_levels)
+
+p_heatmap <- ggplot(plot_df, aes(x = Activity, y = Person_title, fill = Level)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  # Black border box around the highlighted person's row
+  annotate(
+    "rect",
+    xmin = 0.5, xmax = n_activities + 0.5,
+    ymin = highlight_y - 0.5, ymax = highlight_y + 0.5,
+    fill = NA, color = "black", linewidth = 1.2
+  ) +
+  scale_fill_manual(
+    values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+    name = "Involvement"
+  ) +
+  scale_y_discrete(labels = y_labels) +
+  labs(
+    title = "Collecting and Discovery: Involvement by Person",
+    subtitle = paste0(highlight_person, " highlighted"),
+    x = "Activity",
+    y = "Person"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_markdown(),   # allows the ** bold ** markdown to render
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_heatmap)
+ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height = 6, dpi = 150)
+
+# # ============================================================================
+# # OPTION 2: BUBBLE CHART (size + color both encode the ordinal level)
+# # ============================================================================
+# p_bubble <- ggplot(plot_df, aes(x = Activity, y = Person_title)) +
+#   geom_point(aes(size = Level_num, color = Level), alpha = 0.85) +
+#   scale_size_continuous(range = c(2, 10), guide = "none") +
+#   scale_color_manual(
+#     values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+#     name = "Involvement"
+#   ) +
+#   labs(
+#     title = "Collecting and Discovery: Involvement by Person",
+#     x = "Activity",
+#     y = "Person"
+#   ) +
+#   theme_minimal(base_size = 12) +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1),
+#     panel.grid.minor = element_blank(),
+#     plot.title = element_text(face = "bold")
+#   )
+# 
+# print(p_bubble)
+# ggsave("collecting_discovery_bubble.png", plot = p_bubble, width = 10, height = 6, dpi = 150)
+```
+## Collecting and Discovery
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+
+# --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+
+# --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
+plot_df <- df %>%
+  select(x, starts_with("Collecting and discovery_")) %>%
+  pivot_longer(
+    cols = -x,
+    names_to = "Activity",
+    values_to = "Level"
+  ) %>%
+  mutate(
+    # Strip the "Collecting and discovery_" prefix for cleaner labels
+    Activity = str_remove(Activity, "^Collecting and discovery_"),
+    # Order the ordinal levels RARE < TOUCH < DO
+    Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE)
+  )
+
+# ============================================================================
+# HEATMAP  (with Librarian_Me's axis label bolded + colored to highlight it)
+# ============================================================================
+highlight_person <- "Librarian_Me"
+
+# Preserve a fixed row order so label order matches the data
+person_levels <- unique(plot_df$x)
+plot_df <- plot_df %>%
+  mutate(Person_title = factor(x, levels = person_levels))
+
+# Per-label styling vectors -- no extra packages needed.
+# ggplot2 (>= 3.3) supports vectorized axis.text elements, applied in the
+# same order as the axis breaks (person_levels here).
+label_faces  <- ifelse(person_levels == highlight_person, "bold", "plain")
+label_colors <- ifelse(person_levels == highlight_person, "black", "darkgrey")
+
+p_heatmap <- ggplot(plot_df, aes(x = Activity, y = Person_title, fill = Level)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  scale_fill_manual(
+    values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+    name = "Involvement"
+  ) +
+  labs(
+    title = "Collecting and Discovery: Involvement by Person",
+    x = "Activity",
+    y = "Person"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(face = label_faces, colour = label_colors),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_heatmap)
+ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height = 6, dpi = 150)
+```
+
+## Exploration and Analysis
+```{r}
+# --- Reshape: grab Person_title + all "Exploration and analysis_*" columns ---
+plot_df2 <- df %>%
+  select(x, starts_with("Exploration and analysis_")) %>%
+  pivot_longer(
+    cols = -x,
+    names_to = "Activity",
+    values_to = "Level"
+  ) %>%
+  mutate(
+    # Strip the "Collecting and discovery_" prefix for cleaner labels
+    Activity = str_remove(Activity, "^Exploration and analysis_"),
+    # Order the ordinal levels RARE < TOUCH < DO
+    Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE)
+  )
+
+# ============================================================================
+# HEATMAP  (with Librarian_Me's axis label bolded + colored to highlight it)
+# ============================================================================
+highlight_person <- "Librarian_Me"
+
+# Preserve a fixed row order so label order matches the data
+person_levels <- unique(plot_df$x)
+plot_df2 <- plot_df2 %>%
+  mutate(Person_title = factor(x, levels = person_levels))
+
+# Per-label styling vectors -- no extra packages needed.
+# ggplot2 (>= 3.3) supports vectorized axis.text elements, applied in the
+# same order as the axis breaks (person_levels here).
+label_faces  <- ifelse(person_levels == highlight_person, "bold", "plain")
+label_colors <- ifelse(person_levels == highlight_person, "black", "darkgrey")
+
+p_heatmap2 <- ggplot(plot_df2, aes(x = Activity, y = Person_title, fill = Level)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  scale_fill_manual(
+    values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+    name = "Involvement"
+  ) +
+  labs(
+    title = "Exploration and Analysis: Involvement by Person",
+    x = "Activity",
+    y = "Person"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(face = label_faces, colour = label_colors),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_heatmap2)
+ggsave("exploration_analysis_heatmap.png", plot = p_heatmap2, width = 10, height = 6, dpi = 150)
+```
+
+## Publishing and preserving
+```{r}
+# library(readr)
+# library(dplyr)
+# library(tidyr)
+# library(ggplot2)
+# library(stringr)
+
+# --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+
+# --- Reshape: grab Person_title + all "Publishing and preserving_*" columns ---
+plot_df3 <- df %>%
+  select(x, starts_with("Publishing and preserving_")) %>%
+  pivot_longer(
+    cols = -x,
+    names_to = "Activity",
+    values_to = "Level"
+  ) %>%
+  mutate(
+    # Strip the "Collecting and discovery_" prefix for cleaner labels
+    Activity = str_remove(Activity, "^Publishing and preserving_"),
+    # Order the ordinal levels RARE < TOUCH < DO
+    Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE)
+  )
+
+# ============================================================================
+# HEATMAP  (with Librarian_Me's axis label bolded + colored to highlight it)
+# ============================================================================
+highlight_person <- "Librarian_Me"
+
+# Preserve a fixed row order so label order matches the data
+person_levels <- unique(plot_df3$x)
+plot_df3 <- plot_df3 %>%
+  mutate(Person_title = factor(x, levels = person_levels))
+
+# Per-label styling vectors -- no extra packages needed.
+# ggplot2 (>= 3.3) supports vectorized axis.text elements, applied in the
+# same order as the axis breaks (person_levels here).
+label_faces  <- ifelse(person_levels == highlight_person, "bold", "plain")
+label_colors <- ifelse(person_levels == highlight_person, "black", "darkgrey")
+
+p_heatmap3 <- ggplot(plot_df3, aes(x = Activity, y = Person_title, fill = Level)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  scale_fill_manual(
+    values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+    name = "Involvement"
+  ) +
+  labs(
+    title = "Publishing and Preserving: Involvement by Person",
+    x = "Activity",
+    y = "Person"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(face = label_faces, colour = label_colors),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_heatmap3)
+ggsave("publishing_preserving_heatmap.png", plot = p_heatmap3, width = 10, height = 6, dpi = 150)
+```
+
+```{r}
+# library(readr)
+# library(dplyr)
+# library(tidyr)
+# library(ggplot2)
+# library(stringr)
+
+# --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+
+# --- Reshape: grab Person_title + all "Type of data_*" columns ---
+plot_df4 <- df %>%
+  select(x, starts_with("Type of data_")) %>%
+  pivot_longer(
+    cols = -x,
+    names_to = "Activity",
+    values_to = "Level"
+  ) %>%
+  mutate(
+    # Strip the "Collecting and discovery_" prefix for cleaner labels
+    Activity = str_remove(Activity, "^Type of data_"),
+    # Order the ordinal levels RARE < TOUCH < DO
+    Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE)
+  )
+
+# ============================================================================
+# HEATMAP  (with Librarian_Me's axis label bolded + colored to highlight it)
+# ============================================================================
+highlight_person <- "Librarian_Me"
+
+# Preserve a fixed row order so label order matches the data
+person_levels <- unique(plot_df4$x)
+plot_df4 <- plot_df4 %>%
+  mutate(Person_title = factor(x, levels = person_levels))
+
+# Per-label styling vectors -- no extra packages needed.
+# ggplot2 (>= 3.3) supports vectorized axis.text elements, applied in the
+# same order as the axis breaks (person_levels here).
+label_faces  <- ifelse(person_levels == highlight_person, "bold", "plain")
+label_colors <- ifelse(person_levels == highlight_person, "black", "darkgrey")
+
+p_heatmap4 <- ggplot(plot_df4, aes(x = Activity, y = Person_title, fill = Level)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  scale_fill_manual(
+    values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+    name = "Involvement"
+  ) +
+  labs(
+    title = "Publishing and Preserving: Involvement by Person",
+    x = "Activity",
+    y = "Person"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(face = label_faces, colour = label_colors),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_heatmap4)
+ggsave("type_of_data_heatmap.png", plot = p_heatmap4, width = 10, height = 6, dpi = 150)
+```
+
+
+```{r}
+# library(readr)
+# library(dplyr)
+# library(tidyr)
+# library(ggplot2)
+# library(stringr)
+# library(ggtext)   # install.packages("ggtext") if you haven't -- then RESTART R
+# 
+# # --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+# 
+# # --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
+# plot_df <- df %>%
+#   select(Person_title, starts_with("Collecting and discovery_")) %>%
+#   pivot_longer(
+#     cols = -Person_title,
+#     names_to = "Activity",
+#     values_to = "Level"
+#   ) %>%
+#   mutate(
+#     # Strip the "Collecting and discovery_" prefix for cleaner labels
+#     Activity = str_remove(Activity, "^Collecting and discovery_"),
+#     # Order the ordinal levels RARE < TOUCH < DO
+#     Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE)
+#   )
+# 
+# # ============================================================================
+# # HEATMAP  (Librarian_Me's axis label gets a yellow highlighter box, no bold)
+# # ============================================================================
+# highlight_person <- "Librarian_Me"
+# 
+# # Preserve a fixed row order so label order matches the data
+# person_levels <- unique(plot_df$Person_title)
+# plot_df <- plot_df %>%
+#   mutate(Person_title = factor(Person_title, levels = person_levels))
+# 
+# # Wrap only the target label in a <span> with a yellow background.
+# # No <b> tag this time -- font stays regular weight.
+# y_labels <- ifelse(
+#   person_levels == highlight_person,
+#   paste0("<span style='background-color:#ffe600; padding:2px 4px;'>", person_levels, "</span>"),
+#   person_levels
+# )
+# 
+# p_heatmap <- ggplot(plot_df, aes(x = Activity, y = Person_title, fill = Level)) +
+#   geom_tile(color = "white", linewidth = 0.6) +
+#   scale_fill_manual(
+#     values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+#     name = "Involvement"
+#   ) +
+#   scale_y_discrete(labels = y_labels) +
+#   labs(
+#     title = "Collecting and Discovery: Involvement by Person",
+#     x = "Activity",
+#     y = "Person"
+#   ) +
+#   theme_minimal(base_size = 12) +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1),
+#     axis.text.y = element_markdown(),   # renders the <span> highlight markup
+#     panel.grid = element_blank(),
+#     plot.title = element_text(face = "bold")
+#   )
+# 
+# print(p_heatmap)
+# ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height = 6, dpi = 150)
+```
+```{r}
+# library(readr)
+# library(dplyr)
+# library(tidyr)
+# library(ggplot2)
+# library(stringr)
+# 
+# # --- Load data -----------------------------------------------------------
+# df <- read_csv("capstone_data_correct_header.csv")
+# 
+# # --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
+# plot_df <- df %>%
+#   select(Person_title, starts_with("Collecting and discovery_")) %>%
+#   pivot_longer(
+#     cols = -Person_title,
+#     names_to = "Activity",
+#     values_to = "Level"
+#   ) %>%
+#   mutate(
+#     Activity = str_remove(Activity, "^Collecting and discovery_"),
+#     Level = factor(Level, levels = c("RARE", "TOUCH", "DO"), ordered = TRUE)
+#   )
+# 
+# # ============================================================================
+# # HEATMAP  (Librarian_Me's label gets a yellow highlighter box -- plain
+# # ggplot2 only, no ggtext. We hide the built-in axis labels and draw our
+# # own text just left of the panel, with a colored rect behind the one we
+# # want to highlight.)
+# # ============================================================================
+# highlight_person <- "Librarian_Me"
+# 
+# person_levels <- unique(plot_df$Person_title)
+# plot_df <- plot_df %>%
+#   mutate(Person_title = factor(Person_title, levels = person_levels))
+# 
+# n_people <- length(person_levels)
+# highlight_y <- which(person_levels == highlight_person)
+# 
+# # Custom label positions (one per person), placed in the blank space we
+# # create to the left of the panel via scale_x_discrete(expand = ...) below
+# label_df <- data.frame(
+#   Person_title = factor(person_levels, levels = person_levels),
+#   x = -2.2
+# )
+# 
+# # Adjust these two if the box doesn't fit your longest name / font size
+# box_xmin <- -3.9
+# box_xmax <- -0.6
+# 
+# p_heatmap <- ggplot(plot_df, aes(x = Activity, y = Person_title, fill = Level)) +
+#   # Yellow highlighter box FIRST so it sits behind the text drawn later
+#   annotate(
+#     "rect",
+#     xmin = box_xmin, xmax = box_xmax,
+#     ymin = highlight_y - 0.4, ymax = highlight_y + 0.4,
+#     fill = "#ffe600", color = NA
+#   ) +
+#   geom_tile(color = "white", linewidth = 0.6) +
+#   geom_text(data = label_df, aes(x = x, y = Person_title, label = Person_title),
+#             inherit.aes = FALSE, hjust = 1, size = 3.6) +
+#   scale_fill_manual(
+#     values = c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15"),
+#     name = "Involvement"
+#   ) +
+#   # Reserve blank space on the left for our custom labels + highlighter box
+#   scale_x_discrete(expand = expansion(add = c(4.3, 0.6))) +
+#   labs(
+#     title = "Collecting and Discovery: Involvement by Person",
+#     x = "Activity",
+#     y = NULL
+#   ) +
+#   theme_minimal(base_size = 12) +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1),
+#     axis.text.y = element_blank(),   # replaced by our own geom_text labels
+#     axis.ticks.y = element_blank(),
+#     panel.grid = element_blank(),
+#     plot.title = element_text(face = "bold")
+#   )
+# 
+# print(p_heatmap)
+# ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 11.5, height = 6, dpi = 150)
+```
+
