@@ -23,11 +23,48 @@ library(readxl)
 ```{r}
 library(readxl)
 library(readr)
-df <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (3).csv", skip = 2)
+df <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (6).csv", skip = 2)
 
 ```
+# Rename
+Librarian_AB	
+Librarian_GW	
+Librarian_Me	
+Librarian_MK	
+Librarian_SM	
+Librarian_SR	
+Librarian_FH
+Librarian_SW
+Professor_TF
+Professor_YK
+Staff_JP
 
+```{r}
+# rename variables
+# rename(df, new_name = old_name)        
 
+rename(df, Title_Person = Person_title)
+```
+
+9-23-2026 Google AI mode
+library(dplyr)
+
+# Sample Data
+df <- data.frame(status = c("A", "B", "C", "A"))
+
+# Create a new column with renamed values
+df <- df %>% 
+  mutate(status_full = case_match(status,
+    "A" ~ "Active",
+    "B" ~ "Pending",
+    "C" ~ "Cancelled",
+    .default = status # Keeps original value if no match is found
+  ))
+  
+```{r}
+
+```
+  
 
 ```{r}
 # Read just the very first row
@@ -75,13 +112,13 @@ write csv of this version
 ```
 
 ```{r}
-library(ggplot2)
-library(readr)
-library(dplyr)
-
-# --- Load data ---------------------------------------------------------
-# df <- read_csv("capstone_data_correct_header.csv")
-
+# library(ggplot2)
+# library(readr)
+# library(dplyr)
+# 
+# # --- Load data ---------------------------------------------------------
+# # df <- read_csv("capstone_data_correct_header.csv")
+# 
 # First two columns, referenced by position (robust to header changes)
 x_col <- names(df)[1]
 y_col <- names(df)[2]
@@ -90,7 +127,7 @@ df <- df %>%
   rename(x = 1, y = 2)
 
 
-df$y <- as.numeric(df$y)
+# df$y <- as.numeric(df$y)
 ```
 
 # Bar chart for activities
@@ -114,6 +151,7 @@ p <- ggplot(df, aes(x = reorder(x, -y), y = y, fill = y)) +
     plot.title = element_text(face = "bold")
   )
 
+
 print(p)
 
 ggsave("bar_chart_R.png", plot = p, width = 10, height = 6, dpi = 150)
@@ -129,6 +167,8 @@ library(stringr)
 
 # --- Load data -----------------------------------------------------------
 # df <- read_csv("capstone_data_correct_header.csv")
+df <- df %>%
+  rename(Person_title = 1, y = 2)
 
 # --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
 plot_df <- df %>%
@@ -175,7 +215,7 @@ ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height 
 
 ```{r}
 # ============================================================================
-# OPTION 2: BUBBLE CHART (size + color both encode the ordinal level)
+# BUBBLE CHART (size + color both encode the ordinal level)
 # ============================================================================
 # p_bubble <- ggplot(plot_df, aes(x = Activity, y = Person_title)) +
 #   geom_point(aes(size = Level_num, color = Level), alpha = 0.85) +
@@ -200,6 +240,8 @@ ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height 
 # ggsave("collecting_discovery_bubble.png", plot = p_bubble, width = 10, height = 6, dpi = 150)
 ```
 
+
+
 ```{r}
 library(readr)
 library(dplyr)
@@ -213,9 +255,9 @@ library(ggtext)   # install.packages("ggtext") -- enables per-label bold/color o
 
 # --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
 plot_df <- df %>%
-  select(Person_title, starts_with("Collecting and discovery_")) %>%
+  select(x, starts_with("Collecting and discovery_")) %>%
   pivot_longer(
-    cols = -Person_title,
+    cols = -x,
     names_to = "Activity",
     values_to = "Level"
   ) %>%
@@ -233,9 +275,9 @@ plot_df <- df %>%
 highlight_person <- "Librarian_Me"
 
 # Preserve a fixed row order so we can compute the highlighted row's y-position
-person_levels <- unique(plot_df$Person_title)
+person_levels <- unique(plot_df$x)
 plot_df <- plot_df %>%
-  mutate(Person_title = factor(Person_title, levels = person_levels))
+  mutate(Person_title = factor(x, levels = person_levels))
 
 n_activities <- n_distinct(plot_df$Activity)
 highlight_y <- which(person_levels == highlight_person)
@@ -303,15 +345,22 @@ ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height 
 ```
 ## Collecting and Discovery
 ```{r}
-library(readr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(stringr)
+# library(ggplot2)
+library(forcats)
+# 
+# ggplot(df, aes(x = x_variable, y = fct_rev(factor(y_variable)))) +
+#   geom_point() +
+#   labs(y = "Alphabetical Y-Axis")
+# library(readr)
+# library(dplyr)
+# library(tidyr)
+# library(ggplot2)
+# library(stringr)
 
 # --- Load data -----------------------------------------------------------
 # df <- read_csv("capstone_data_correct_header.csv")
-
+df <- df %>%
+  rename(x = 1, y = 2)
 # --- Reshape: grab Person_title + all "Collecting and discovery_*" columns ---
 plot_df <- df %>%
   select(x, starts_with("Collecting and discovery_")) %>%
@@ -362,12 +411,13 @@ p_heatmap <- ggplot(plot_df, aes(x = Activity, y = Person_title, fill = Level)) 
     plot.title = element_text(face = "bold")
   )
 
-print(p_heatmap)
+p_heatmap
 ggsave("collecting_discovery_heatmap.png", plot = p_heatmap, width = 10, height = 6, dpi = 150)
 ```
 
 ## Exploration and Analysis
 ```{r}
+
 # --- Reshape: grab Person_title + all "Exploration and analysis_*" columns ---
 plot_df2 <- df %>%
   select(x, starts_with("Exploration and analysis_")) %>%
@@ -519,6 +569,7 @@ highlight_person <- "Librarian_Me"
 
 # Preserve a fixed row order so label order matches the data
 person_levels <- unique(plot_df4$x)
+
 plot_df4 <- plot_df4 %>%
   mutate(Person_title = factor(x, levels = person_levels))
 
@@ -535,7 +586,7 @@ p_heatmap4 <- ggplot(plot_df4, aes(x = Activity, y = Person_title, fill = Level)
     name = "Involvement"
   ) +
   labs(
-    title = "Publishing and Preserving: Involvement by Person",
+    title = "Type of Data: Involvement by Person",
     x = "Activity",
     y = "Person"
   ) +
@@ -547,7 +598,7 @@ p_heatmap4 <- ggplot(plot_df4, aes(x = Activity, y = Person_title, fill = Level)
     plot.title = element_text(face = "bold")
   )
 
-print(p_heatmap4)
+p_heatmap4
 ggsave("type_of_data_heatmap.png", plot = p_heatmap4, width = 10, height = 6, dpi = 150)
 ```
 
