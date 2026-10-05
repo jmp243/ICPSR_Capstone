@@ -65,7 +65,7 @@ level_colors <- c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15")
   
 ## Personnel Titles
 
-- 9 Librarians with functional titles and subject area liaisonhips
+- 9 Librarians with functional titles and subject area liaisons
 - 1 Library staff with patent and copyright expertise
 - 2 Technical services librarians
 - 2 Faculty in mathematics, statistics, and physics
@@ -92,6 +92,29 @@ df <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/cap
 y_col <- names(df)[2]
 df <- df %>% rename(x = 1, y = 2)
 
+```
+```{r}
+name_map <- c(
+  "Librarian_Me" = "Librarian 1 (me)",
+  "Librarian_SR" = "Librarian 2",
+  "Librarian_AB" = "Librarian 3",
+  "Librarian_MK" = "Librarian 4",
+  "Librarian_GW" = "Librarian 5",
+  "Librarian_SM" = "Librarian 6",
+  "Librarian_FH" = "Librarian 7",
+  "Librarian_SW" = "Librarian 8",
+  "Librarian_RC" = "Librarian 9",
+  "Professor_YK" = "Faculty 1",
+  "Professor_TF" = "Faculty 2",
+  "Staff_JP"     = "Staff 1"
+)
+
+df <- df %>% mutate(x = unname(name_map[x]))
+
+# update the settings to match
+highlight_person <- "Librarian 1 (me)"
+exclude_person   <- "Librarian 9"
+my_order <- unname(name_map)
 
 ```
 
@@ -111,7 +134,7 @@ p_bar <- ggplot(df, aes(x = reorder(x, -y), y = y, fill = y)) +
             vjust = -0.5, fontface = "bold", size = 3.5) +
   scale_fill_viridis_c(name = y_col, guide = "none") +
   labs(
-    title = "Percentage Time Allocated by Person",
+    title = "Percentage Time Allocated for Data Services by Person",
     x = "Title of Person",
     y = "Percentage of Work Hours"
   ) +
@@ -137,7 +160,7 @@ Each activity is rated on an ordinal scale:
 | **TOUCH** | Touches the work sometimes | [ ]{style="background:#fb6a4a;padding:2px 12px;"} |
 | **DO** | Does the work | [ ]{style="background:#a50f15;padding:2px 12px;"} |
 
-The row label for **`Librarian_Me`** is shown in bold to highlight it.
+The row label for **`Librarian 1 (me)`** is shown in bold to highlight it.
 
 ::: notes
 A Reusable Heatmap Function
@@ -147,11 +170,6 @@ The same reshape-and-plot steps repeat for each section, so they are wrapped in 
 ```{r heatmap-fn}
 #| echo: true
 
-my_order <- c("Librarian_Me", "Librarian_AB", "Librarian_FH", "Librarian_GW", "Librarian_MK", "Librarian_RC", "Librarian_SM", "Librarian_SR", "Librarian_SW", "Professor_TF", "Professor_YK", "Staff_JP" 
-            )
-
-df <- df %>%
-  mutate(x = factor(x, levels = my_order))
 
 make_heatmap <- function(data, prefix, title, exclude = NULL, person_order = NULL) {
 
@@ -178,7 +196,7 @@ make_heatmap <- function(data, prefix, title, exclude = NULL, person_order = NUL
   ggplot(plot_df, aes(x = Activity, y = Person, fill = Level)) +
     geom_tile(color = "white", linewidth = 0.6) +
     scale_fill_manual(values = level_colors, name = "Involvement") +
-    labs(title = title, x = "Activity", y = "Person") +
+    labs(title = title, x = "Activity", y = "") +
     theme_minimal(base_size = 12) +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
@@ -200,7 +218,8 @@ p_heatmap <- make_heatmap(
   df,
   prefix  = "Collecting and discovery_",
   title   = "Collecting and Discovery: Involvement by Person",
-  exclude = exclude_person
+  exclude = exclude_person,
+  person_order = my_order
 )
 p_heatmap
 ```
@@ -215,7 +234,8 @@ p_heatmap2 <- make_heatmap(
   df,
   prefix  = "Exploration and analysis_",
   title   = "Exploration and Analysis: Involvement by Person",
-  exclude = exclude_person
+  exclude = exclude_person,
+  person_order = my_order
 )
 p_heatmap2
 ```
@@ -230,8 +250,9 @@ p_heatmap3 <- make_heatmap(
   df,
   prefix  = "Publishing and preserving_",
   title   = "Publishing and Preserving: Involvement by Person",
-  exclude = exclude_person
-)
+  exclude = exclude_person,
+  person_order = my_order
+  )
 p_heatmap3
 ```
 
@@ -245,6 +266,7 @@ p_heatmap3
 # (Librarian_RC is not excluded).
 p_heatmap4 <- make_heatmap(
   df,
+  person_order = my_order,
   prefix = "Type of data_",
   title  = "Type of Data: Involvement by Person"
 )
@@ -253,11 +275,11 @@ p_heatmap4
 
 ## Key Takeaways
 
-- *At a smaller R2 institution, the solo data librarian is involved in many stages of the data life cycle*
-- *Informing subject area librarians of key data resources helped those needing to find data*
-- *As `Librarian_Me` establishes the position, I am identifying a strong preference for teaching data analysis skills* 
-- *A growing need to geo-spatial data and visual data has emerged*
-- *Greater across campus partnerships with Office of Research and Data Governance has developed*
+- At a smaller R2 institution, the solo data librarian is involved in many stages of the data life cycle
+- Informing subject area librarians of key data resources helped those needing to find data
+- As the data librarian, I am identifying a strong preference for teaching data analysis skills 
+- A growing need to geo-spatial data and visual data has emerged
+- Greater across campus partnerships with Office of Research and Data Governance has developed
 
 ## Questions?
 
