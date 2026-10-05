@@ -1,0 +1,278 @@
+---
+title: "Providing Data Services at an R2 Institution:"
+subtitle: "Who Does What?"
+author: "Jung Mee Park, PhD"
+format:
+  revealjs:
+    theme: sky
+    slide-number: true
+    transition: fade
+    code-line-numbers: false
+    fig-align: center
+  pptx:  
+    slide-number: true
+    fig-align: center
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(forcats)
+
+# ---- EDIT THIS: path to your data file ------------------------------------
+# Put the CSV next to this .qmd file (or give a full path).
+# data_path <- "capstone_data - Sheet1 (7).csv"
+
+# Person whose row label is bolded in every heatmap
+highlight_person <- "Librarian_Me"
+
+# Person excluded from the activity heatmaps
+exclude_person <- "Librarian_RC"
+
+# Involvement levels (ordinal: RARE < TOUCH < DO)
+level_order  <- c("RARE", "TOUCH", "DO")
+level_colors <- c("RARE" = "#fee5d9", "TOUCH" = "#fb6a4a", "DO" = "#a50f15")
+```
+
+## Overview
+
+- **Goal:** understand how staff time and responsibilities are distributed across the university
+- **Data:** capstone worksheet, tidy spreadsheet
+- **Approach:** R + tidyverse + ggplot2 with the help of Claude.ai Sonnet 5.5 Medium
+
+## What is an R2? 
+- Carnegie Classification of Institutions of Higher Education
+  - R2s are "Doctoral Universities: High Research Activity"
+  - That confer at least 20 doctorates but fewer than 70
+  - At least $5 million in R&D (R1 threshold is at least $50 million)
+  
+## Wichita State University Libraries
+<!-- Image from a web URL -->
+![Reclining Figure (Hand) by Henry Moore](https://www.wichita.edu/about/wsunews/news/2022/04-april/_images/sculptures_ablah_1200.jpg){width=33%}
+  
+  - Main Library and Music & Fine Arts Library
+  
+  - Research and Instructional Services, Tech Services, and Access Services Librarians
+  
+## Personnel Titles
+
+- 9 Librarians with functional titles and subject area liaisonhips
+- 1 Library staff with patent and copyright expertise
+- 2 Technical services librarians
+- 2 Faculty in mathematics, statistics, and physics
+
+## Roadmap
+
+1.  Percentage of time allocated by person
+2.  Involvement heatmaps by stage of the data life cycle
+    - Collecting and discovery
+    - Exploration and analysis
+    - Publishing and preserving
+3.  Involvement by data type
+
+::: notes
+Load and Prepare the Data
+
+```{r load-data}
+#| echo: false
+
+df <- read_csv("T:/JungMee/ICPSR_data/Providing_data_services/ICPSR Capstone/capstone_data - Sheet1 (7).csv", skip = 2)
+
+# Refer to the first two columns by position (robust to header changes):
+#   x = person's title, y = percentage of work hours
+y_col <- names(df)[2]
+df <- df %>% rename(x = 1, y = 2)
+
+
+```
+
+
+The first two rows of the sheet are skipped. Columns 1 and 2 are renamed by position so the code still works if the header text changes.
+:::
+
+## Percentage Time Allocated by Person
+
+```{r bar-chart}
+#| fig-width: 10
+#| fig-height: 6
+
+p_bar <- ggplot(df, aes(x = reorder(x, -y), y = y, fill = y)) +
+  geom_col(color = "black", width = 0.7) +
+  geom_text(aes(label = paste0(y, "%")),
+            vjust = -0.5, fontface = "bold", size = 3.5) +
+  scale_fill_viridis_c(name = y_col, guide = "none") +
+  labs(
+    title = "Percentage Time Allocated by Person",
+    x = "Title of Person",
+    y = "Percentage of Work Hours"
+  ) +
+  ylim(0, max(df$y) * 1.15) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+p_bar
+```
+
+## How to Interpret the Heatmaps
+
+Each activity is rated on an ordinal scale:
+
+| Level | Meaning | Colour |
+|------------------|--------------------------|-----------------------------|
+| **RARE** | Rarely involved | [ ]{style="background:#fee5d9;padding:2px 12px;"} |
+| **TOUCH** | Touches the work sometimes | [ ]{style="background:#fb6a4a;padding:2px 12px;"} |
+| **DO** | Does the work | [ ]{style="background:#a50f15;padding:2px 12px;"} |
+
+The row label for **`Librarian_Me`** is shown in bold to highlight it.
+
+::: notes
+A Reusable Heatmap Function
+
+The same reshape-and-plot steps repeat for each section, so they are wrapped in one function.
+
+```{r heatmap-fn}
+#| echo: true
+
+my_order <- c("Librarian_Me", "Librarian_AB", "Librarian_FH", "Librarian_GW", "Librarian_MK", "Librarian_RC", "Librarian_SM", "Librarian_SR", "Librarian_SW", "Professor_TF", "Professor_YK", "Staff_JP" 
+            )
+
+df <- df %>%
+  mutate(x = factor(x, levels = my_order))
+
+make_heatmap <- function(data, prefix, title, exclude = NULL, person_order = NULL) {
+
+  d <- data
+  if (!is.null(exclude)) d <- filter(d, x != exclude)
+
+  # use your order if given, otherwise the order in the data
+  lv <- if (is.null(person_order)) unique(as.character(d$x)) else
+        person_order[person_order %in% d$x]
+
+  plot_df <- d %>%
+    select(x, starts_with(prefix)) %>%
+    pivot_longer(-x, names_to = "Activity", values_to = "Level") %>%
+    mutate(
+      Activity = str_remove(Activity, fixed(prefix)),
+      Level    = factor(Level, levels = level_order, ordered = TRUE),
+      Person   = factor(x, levels = lv)            # <- was unique(x)
+    )
+
+  person_levels <- levels(plot_df$Person)          # <- uncommented
+  faces  <- ifelse(person_levels == highlight_person, "bold", "plain")
+  colors <- ifelse(person_levels == highlight_person, "black", "darkgrey")
+
+  ggplot(plot_df, aes(x = Activity, y = Person, fill = Level)) +
+    geom_tile(color = "white", linewidth = 0.6) +
+    scale_fill_manual(values = level_colors, name = "Involvement") +
+    labs(title = title, x = "Activity", y = "Person") +
+    theme_minimal(base_size = 12) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.y = element_text(face = faces, colour = colors),
+      panel.grid  = element_blank(),
+      plot.title  = element_text(face = "bold")
+    )
+}
+```
+:::
+
+## Collecting and Discovery
+
+```{r heatmap-collecting}
+#| fig-width: 10
+#| fig-height: 6
+
+p_heatmap <- make_heatmap(
+  df,
+  prefix  = "Collecting and discovery_",
+  title   = "Collecting and Discovery: Involvement by Person",
+  exclude = exclude_person
+)
+p_heatmap
+```
+
+## Exploration and Analysis
+
+```{r heatmap-exploration}
+#| fig-width: 10
+#| fig-height: 6
+
+p_heatmap2 <- make_heatmap(
+  df,
+  prefix  = "Exploration and analysis_",
+  title   = "Exploration and Analysis: Involvement by Person",
+  exclude = exclude_person
+)
+p_heatmap2
+```
+
+## Publishing and Preserving
+
+```{r heatmap-publishing}
+#| fig-width: 10
+#| fig-height: 6
+
+p_heatmap3 <- make_heatmap(
+  df,
+  prefix  = "Publishing and preserving_",
+  title   = "Publishing and Preserving: Involvement by Person",
+  exclude = exclude_person
+)
+p_heatmap3
+```
+
+## Types of Data
+
+```{r heatmap-types}
+#| fig-width: 10
+#| fig-height: 6
+
+# Note: as in the original script, this chart includes all people
+# (Librarian_RC is not excluded).
+p_heatmap4 <- make_heatmap(
+  df,
+  prefix = "Type of data_",
+  title  = "Type of Data: Involvement by Person"
+)
+p_heatmap4
+```
+
+## Key Takeaways
+
+- *At a smaller R2 institution, the solo data librarian is involved in many stages of the data life cycle*
+- *Informing subject area librarians of key data resources helped those needing to find data*
+- *As `Librarian_Me` establishes the position, I am identifying a strong preference for teaching data analysis skills* 
+- *A growing need to geo-spatial data and visual data has emerged*
+- *Greater across campus partnerships with Office of Research and Data Governance has developed*
+
+## Questions?
+
+- Jung Mee Park
+- jungmee.park@wichita.edu
+- https://libraries.wichita.edu/data
+
+```{r save-plots}
+#| include: false
+#| eval: false
+
+# Optional: run manually to export the static PNGs from the original script
+ggsave("bar_chart_R.png", p_bar, width = 10, height = 6, dpi = 150)
+ggsave("collecting_discovery_heatmap.png", p_heatmap, width = 10, height = 6, dpi = 150)
+ggsave("exploration_analysis_heatmap.png", p_heatmap2, width = 10, height = 6, dpi = 150)
+ggsave("publishing_preserving_heatmap.png", p_heatmap3, width = 10, height = 6, dpi = 150)
+ggsave("type_of_data_heatmap.png", p_heatmap4, width = 10, height = 6, dpi = 150)
+```
